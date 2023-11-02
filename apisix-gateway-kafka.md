@@ -256,13 +256,6 @@ kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/instance 
 
 # list topic
 curl --verbose --header "Host: example.com" http://localhost:9080/topics
-```
-
-## Sending and Receiving Message by Envoy Gateway
-
-```bash
-# list topic
-curl --header "Host: example.com" http://localhost:9080/topics
 
 # send message to the topic
 curl --header "Host: example.com" --location 'http://localhost:9080/topics/event' -H 'Content-Type: application/vnd.kafka.json.v2+json' --data \
