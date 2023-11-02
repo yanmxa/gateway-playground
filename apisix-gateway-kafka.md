@@ -191,6 +191,28 @@ while true; do curl -X GET http://localhost:8080/consumers/strimzi-kafka-consume
 
 ## Install Apisix on Openshift
 
+### Develope a plugin for the apisix
+
+- https://apisix.apache.org/zh/docs/ingress-controller/tutorials/how-to-use-go-plugin-runner-in-apisix-ingress/
+- https://www.apiseven.com/blog/go-makes-apache-apisix-better
+- https://zhuanlan.zhihu.com/p/613540331
+- others
+```bash
+make build
+
+# create Dockerfile with following content
+FROM apache/apisix:3.6.0-debian
+
+COPY ./go-runner /usr/local/apisix-go-plugin-runner/go-runner
+
+# build and push image
+docker build -f ./Dockerfile -t quay.io/myan/apisix-360-go:0.1 .
+docker push quay.io/myan/apisix-360-go:0.1
+```
+
+
+
+
 ### Referrence
 - https://docs.api7.ai/apisix/install/kubernetes/rosa
 - https://apisix.apache.org/zh/docs/helm-chart/apisix/
@@ -296,4 +318,39 @@ curl --header "Host: example.com" -X POST http://localhost:9080/consumers/strimz
 # consume message with the consumer
 while true; do curl --header "Host: example.com" -X GET http://localhost:9080/consumers/strimzi-kafka-consumer-group/instances/strimzi-kafka-consumer/records \
 -H 'accept: application/vnd.kafka.json.v2+json'; sleep 1; done
+```
+
+## Start authentication with go plugin of apisix
+
+
+
+### Add the plugin runner image to config.yaml
+
+```bash
+# edit cm apisix to add image: quay.io/myan/apisix-310-go:0.1
+apisix:
+  image: quay.io/myan/apisix-310-go:0.1
+
+# then check the apisix server config: /usr/local/apisix/conf/config.yaml
+
+curl "http://127.0.0.1:9180/apisix/admin/routes/1" \
+-H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" -X PUT -d '
+{
+  "methods": ["GET", "POST", "DELETE", "PUT"],
+  "host": "example.com",
+  "uri": "/*",
+  "plugins": {
+        "ext-plugin-post-resp": {
+            "conf" : [
+                {"name": "my-response-rewrite", "value": "{\"tag\":\"hello my response\"}"}
+            ]
+        }
+  },
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "strimzi-kafka-bridge-bridge-service.multicluster-global-hub.svc:8080": 1
+    }
+  }
+}'
 ```
