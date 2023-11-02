@@ -6,7 +6,7 @@
 - helm
 - operator-sdk
 
-## [Install Kafka](./others/install-kafka.md)
+## [Install Kafka](./../others/install-kafka.md)
 
 ## Expose the Kafka Cluster By KafkaBridge
 
@@ -34,6 +34,7 @@ EOF
 - Verification
 
 ```bash
+KAFKA_NAMESPACE=kafka
 
 # forward 8080 by bridge pod
 kubectl -n ${KAFKA_NAMESPACE} port-forward $(kubectl get pods -l strimzi.io/cluster=strimzi-kafka-bridge -n ${KAFKA_NAMESPACE} -o jsonpath="{.items[0].metadata.name}") 8080:8080

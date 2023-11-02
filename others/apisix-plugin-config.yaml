@@ -1,2 +1,0 @@
-ext-plugin:
-  cmd: ["/path/to/apisix-go-plugin-runner/go-runner", "run"]

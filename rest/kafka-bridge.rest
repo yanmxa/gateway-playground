@@ -1,0 +1,43 @@
+### list topic
+GET http://localhost:8080/topics
+
+### send message to the topic
+curl --location 'http://localhost:8080/topics/event' -H 'Content-Type: application/vnd.kafka.json.v2+json' --data \
+'{
+   "records":[
+      {
+         "key":"event1",
+         "value": "1"
+      },
+      {
+         "key":"event2",
+         "value":"2"
+      }
+   ]
+}'
+
+#### register a kafka consumer in a new consumer group
+curl -X POST http://localhost:8080/consumers/strimzi-kafka-consumer-group \
+  -H 'content-type: application/vnd.kafka.v2+json' \
+  -d '{
+    "name": "strimzi-kafka-consumer",
+    "auto.offset.reset": "earliest",
+    "format": "json",
+    "enable.auto.commit": false,
+    "fetch.min.bytes": 512,
+    "consumer.request.timeout.ms": 30000
+  }'
+
+### subscribe to the topic
+curl -X POST http://localhost:8080/consumers/strimzi-kafka-consumer-group/instances/strimzi-kafka-consumer/subscription \
+  -H 'content-type: application/vnd.kafka.v2+json' \
+  -d '{
+    "topics": [
+        "event"
+    ]
+}'
+
+### consume message with the consumer
+GET http://localhost:8080/consumers/strimzi-kafka-consumer-group/instances/strimzi-kafka-consumer/records
+Content-Type: application/json
+accept: application/vnd.kafka.json.v2+json
