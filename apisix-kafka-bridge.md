@@ -1,6 +1,7 @@
-# Access the Kafka Cluster by Envoy Gateway
+# Access the Kafka Cluster by APISIX Gateway
 
-## Prerequisites 
+## Prerequisites
+
 - Openshift cluster
 - kubectl 
 - helm
@@ -37,6 +38,7 @@ EOF
 KAFKA_NAMESPACE=kafka
 
 # forward 8080 by bridge pod
+# kill -9 $(lsof -t -i:9080)
 kubectl -n ${KAFKA_NAMESPACE} port-forward $(kubectl get pods -l strimzi.io/cluster=strimzi-kafka-bridge -n ${KAFKA_NAMESPACE} -o jsonpath="{.items[0].metadata.name}") 8080:8080
 
 # or forward 8080 by svc
@@ -45,42 +47,6 @@ kubectl -n ${KAFKA_NAMESPACE} port-forward svc/$(kubectl get svc -l strimzi.io/c
 # list topic
 curl http://localhost:8080/topics
 
-# send message to the topic
-curl --location 'http://localhost:8080/topics/event' -H 'Content-Type: application/vnd.kafka.json.v2+json' --data \
-'{
-   "records":[
-      {
-         "key":"event1",
-         "value":{ "hello":"world" }
-      },
-      {
-         "key":"event2",
-         "value":{ "foo":"doo" }
-      }
-   ]
-}'
-
-# register a kafka consumer in a new consumer group
-curl -X POST http://localhost:8080/consumers/strimzi-kafka-consumer-group \
-  -H 'content-type: application/vnd.kafka.v2+json' \
-  -d '{
-    "name": "strimzi-kafka-consumer",
-    "auto.offset.reset": "earliest",
-    "format": "json",
-    "enable.auto.commit": false,
-    "fetch.min.bytes": 512,
-    "consumer.request.timeout.ms": 30000
-  }'
-
-# subscribe to the topic
-curl -X POST http://localhost:8080/consumers/strimzi-kafka-consumer-group/instances/strimzi-kafka-consumer/subscription \
-  -H 'content-type: application/vnd.kafka.v2+json' \
-  -d '{
-    "topics": [
-        "event"
-    ]
-}'
-
 # consume message with the consumer
 while true; do curl -X GET http://localhost:8080/consumers/strimzi-kafka-consumer-group/instances/strimzi-kafka-consumer/records \
 -H 'accept: application/vnd.kafka.json.v2+json'; sleep 1; done
@@ -88,9 +54,9 @@ while true; do curl -X GET http://localhost:8080/consumers/strimzi-kafka-consume
 
 ## Running APISIX on Openshift
 
-### Develope a Customize Plugin and rebuild the APISIX Image
+### Develope a Customize Plugin
 
-- Develop the plugin with golang
+- Build the image with plugin
 
 ```bash
 git clone git@github.com:apache/apisix-go-plugin-runner.git
@@ -105,13 +71,6 @@ COPY ./go-runner /usr/local/apisix/apisix-go-plugin-runner/go-runner
 # build and push image
 docker build -f ./Dockerfile -t quay.io/myan/apisix-360-go:0.1 .
 docker push quay.io/myan/apisix-360-go:0.1
-```
-
-- Edit the `config.yaml` to add plugin startup command
-
-```yaml
-ext-plugin:
-  cmd: ["/usr/local/apisix/apisix-go-plugin-runner/go-runner", "run"]
 ```
 
 - Reference
@@ -164,7 +123,7 @@ spec:
 EOF
 ```
 
-- Startup the plugin when running the server(config.yaml)
+- Startup the plugin when running the server(`config.yaml`)
 
 ```yaml
   etcd:
@@ -187,12 +146,9 @@ ext-plugin:
 
 - Replace the image of the deployment
 
-```yaml
+```bash
 # image: quay.io/myan/apisix-360-go:0.1
 kubectl set image deployment/apisix apisix=quay.io/myan/apisix-360-go:0.1
-
-# set the environment variable required by the go plugin runner
-# kubectl patch deploy apisix -n apisix -p '{"spec":{"template":{"spec":{"containers":[{"name":"apisix","env":[{"name":"APISIX_LISTEN_ADDRESS","value":"unix:/tmp/runner.sock"},{"name":"APISIX_CONF_EXPIRE_TIME","value":"3600"}]}]}}}}'
 ```
 
 ### Config the Kafka Route with Admin API
