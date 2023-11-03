@@ -1,5 +1,20 @@
 # Access the Kafka Cluster by APISIX Gateway
 
+<!-- TOC -->
+
+- [Access the Kafka Cluster by APISIX Gateway](#access-the-kafka-cluster-by-apisix-gateway)
+  - [Prerequisites](#prerequisites)
+  - [Install Kafka](#install-kafka)
+  - [Expose the Kafka Cluster By KafkaBridge](#expose-the-kafka-cluster-by-kafkabridge)
+  - [Running APISIX on Openshift](#running-apisix-on-openshift)
+    - [Develope a Customize Plugin](#develope-a-customize-plugin)
+    - [Install APISIX with the Built Image](#install-apisix-with-the-built-image)
+    - [Config the Kafka Route with Admin API](#config-the-kafka-route-with-admin-api)
+    - [Request the Kafka Route with Client API](#request-the-kafka-route-with-client-api)
+  - [Develop an Authentication Plugin Using Payload](#develop-an-authentication-plugin-using-payload)
+
+<!-- /TOC -->
+
 ## Prerequisites
 
 - Openshift cluster
@@ -265,3 +280,5 @@ while true; do curl --header "Host: example.com" -X GET http://localhost:9080/co
 ```
 
 ## Develop an Authentication Plugin Using Payload
+
+- [Validate Cert Plugin](https://github.com/apache/apisix-go-plugin-runner/commit/84adcb2447287d48419c312f8aba8039c4b1f32d#diff-940fa3214bf2b0eb733540bb2e25fa7d6fbfea4821aa73da98911914a07a54db)

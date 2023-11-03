@@ -2,14 +2,28 @@
 # kill -9 $(lsof -t -i:9080)
 # kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/name=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9080:9080
 
+# environment for terminal: CERT_CONTENT_BASE64=$(base64 < rest/client.crt)
+# environment for clipboard: base64 < rest/client.crt | pbcopy
+@CERT_CONTENT_BASE64 = <clipboard value>
+
+
 ### List topic
 GET http://127.0.0.1:9080/topics
 Host: example.com
 Content-Type: application/json
+Source: client
+Client-Certificate: {{ CERT_CONTENT_BASE64 }}
+
+### CERT_CONTENT_BASE64=$(base64 < rest/client.crt)
+curl -i "http://127.0.0.1:9080/topics" \
+-H 'Host: example.com' \
+-H 'Content-Type: application/vnd.kafka.json.v2+json' \
+-H 'Source: client' \
+-H "Client-Certificate: $CERT_CONTENT_BASE64"
 
 
 ### Send message 
-POST http://localhost:9080/topics/event
+POST https://localhost:9080/topics/event
 Host: example.com
 Content-Type: application/vnd.kafka.json.v2+json
 
@@ -21,6 +35,11 @@ Content-Type: application/vnd.kafka.json.v2+json
       }
    ]
 }
+--data \
+'{
+  "source": "client",
+  "cert": "-----BEGIN CERTIFICATE-----\nMIIDNDCCAhwCFHn7Lz09hzf5i1SbLepKB2mT+Cr6MA0GCSqGSIb3DQEBCwUAMFwxCzAJBgNVBAYTAkNOMRAwDgYDVQQIDAdTaGFhbnhpMQ4wDAYDVQQHDAVYaSdhbjEPMA0GA1UECgwGUmVkSGF0MRowGAYDVQQDDBFYaSdhbiRSZWRoYXQgUm9vdDAeFw0yMzExMDMxMjUwNTdaFw0yMzEyMDMxMjUwNTdaMFExCzAJBgNVBAYTAkNOMRAwDgYDVQQIDAdTaGFhbnhpMQ4wDAYDVQQHDAVYaSdhbjEPMA0GA1UECgwGUmVkSGF0MQ8wDQYDVQQDDAZjbGllbnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCg+KERSpXmzd0Ybu3l0WlQycS41McRzWJv/0cm34iyF2cv/qTsAahOiUiGmrrI/2oNam0VWxRJf/c5G3wJvZihjt3/d9EhYi5YdyElmeqh+pic52wmGgFXvn10wKrtuZsnp/b0f8d/iq0KxmcwQISBB+ya7DmT3R7xF8oxaEzL3xN92ayQuZz4iGDxtEw4vwQ0HJd6jINg/CxmsSHKtqONNDP2K/b/BJlRwl37UFVlOczzGKAdTChqvmTsqJ+D/Mxs7V2TplOLMyn9sOGjG94XfhcE0L9vmtCF5iqa57ayEyaYhchQPVEVpKyqcsachCfo30bBJlwl7cFhlzqKMngBAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAEASul4DewjwqP/zzI4UBxupwalROuEtMz8kSVp+sq0bByf+pxb+E0yKKhGp8Fmel3jjT+mQ1mHZsNz37NIBG0S9/1uHPvO7kwgaGOAYd8cTfzqZOLsSjU7DsEsmZjW90VgKVyj2nrs5cRFBRBq5oechgSrVy4NnodYWPjvdzrDMvOLI5DwCo8XfLWBSexDFhFc8K+IHTRIxS6oH/n4wY9L8q9FbXjknYl9C+qloMSWg+XKqGTUOyAD0RFpK0oGjfyt//1eQk+o2ws0ZziwPnkDP6GTAhrCsrg5HXw1UN9avcJrfHuqPz0PwRXPnQZZwjwgmfzP19C1WLE4b/URt0gI=\n-----END CERTIFICATE-----"
+}'
 
 ### Create consumer
 POST http://localhost:9080/consumers/strimzi-kafka-consumer-group

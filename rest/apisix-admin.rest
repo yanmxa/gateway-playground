@@ -1,6 +1,5 @@
 ### Forward the port
-# kill -9 $(lsof -t -i:9180)
-# kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/instance=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9180:9180
+# kill -9 $(lsof -t -i:9180) && kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/instance=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9180:9180
 
 ### Create Upstream
 PUT http://127.0.0.1:9180/apisix/admin/upstreams/1
@@ -46,6 +45,11 @@ Content-Type: application/json
       "ext-plugin-post-resp": {
         "conf": [
           {"name": "my-response-rewrite", "value": "{\"tag\": \"\"}"}
+        ]
+      },
+      "ext-plugin-pre-req": {
+        "conf": [
+          {"name": "validate-cert", "value": "{}"}
         ]
       }
    },
