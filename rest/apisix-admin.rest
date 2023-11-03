@@ -1,5 +1,10 @@
 ### Forward the port
-# kill -9 $(lsof -t -i:9180) && kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/instance=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9180:9180
+# kill -9 $(lsof -t -i:9180) 
+# kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/instance=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9180:9180
+
+
+# kafka namespace
+@KAFKA_NAMESPACE = multicluster-global-hub
 
 ### Create Upstream
 PUT http://127.0.0.1:9180/apisix/admin/upstreams/1
@@ -9,7 +14,7 @@ Content-Type: application/json
 {
    "type": "roundrobin",
    "nodes": {
-      "strimzi-kafka-bridge-bridge-service.multicluster-global-hub.svc:8080": 1
+      "strimzi-kafka-bridge-bridge-service.{{ KAFKA_NAMESPACE }}.svc:8080": 1
    }
 }
 
@@ -32,7 +37,25 @@ Content-Type: application/json
 }
 
 
-### Or Crate Route and Upstream 
+### Or Crate Route and Upstream without plugin
+PUT http://127.0.0.1:9180/apisix/admin/routes/1
+X-API-KEY: edd1c9f034335f136f87ad84b625c8f1
+Content-Type: application/json
+
+{
+   "methods": ["GET", "POST", "DELETE", "PUT"],
+   "host": "example.com",
+   "uri": "/*",
+   "upstream": {
+      "type": "roundrobin",
+      "nodes": {
+         "strimzi-kafka-bridge-bridge-service.multicluster-global-hub.svc:8080": 1
+      }
+   }
+}
+
+
+### Create Upstream and Route with plugin
 PUT http://127.0.0.1:9180/apisix/admin/routes/1
 X-API-KEY: edd1c9f034335f136f87ad84b625c8f1
 Content-Type: application/json
@@ -42,11 +65,6 @@ Content-Type: application/json
    "host": "example.com",
    "uri": "/*",
    "plugins": {
-      "ext-plugin-post-resp": {
-        "conf": [
-          {"name": "my-response-rewrite", "value": "{\"tag\": \"\"}"}
-        ]
-      },
       "ext-plugin-pre-req": {
         "conf": [
           {"name": "validate-cert", "value": "{}"}
