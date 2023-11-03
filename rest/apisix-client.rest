@@ -1,0 +1,52 @@
+### Forward port: 
+# kill -9 $(lsof -t -i:9080)
+# kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/name=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9080:9080
+
+### List topic
+GET http://127.0.0.1:9080/topics
+Host: example.com
+Content-Type: application/json
+
+
+### Send message 
+POST http://localhost:9080/topics/event
+Host: example.com
+Content-Type: application/vnd.kafka.json.v2+json
+
+{
+   "records": [
+      {
+         "key": "event1",
+         "value": "1"
+      }
+   ]
+}
+
+### Create consumer
+POST http://localhost:9080/consumers/strimzi-kafka-consumer-group
+Host: example.com
+Content-Type: application/vnd.kafka.json.v2+json
+
+{
+   "name": "strimzi-kafka-consumer",
+   "auto.offset.reset": "earliest",
+   "format": "json",
+   "enable.auto.commit": true,
+   "fetch.min.bytes": 512,
+   "consumer.request.timeout.ms": 30000
+}
+
+### Subscribe topic
+POST http://localhost:9080/consumers/strimzi-kafka-consumer-group/instances/strimzi-kafka-consumer/subscription
+Host: example.com
+Content-Type: application/vnd.kafka.json.v2+json
+
+{
+   "topics": ["event"]
+}
+
+
+### Consume message
+GET http://localhost:9080/consumers/strimzi-kafka-consumer-group/instances/strimzi-kafka-consumer/records
+Host: example.com
+Accept: application/vnd.kafka.json.v2+json

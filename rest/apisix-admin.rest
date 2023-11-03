@@ -1,0 +1,63 @@
+### Forward the port
+# kill -9 $(lsof -t -i:9180)
+# kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/instance=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9180:9180
+
+### Create Upstream
+PUT http://127.0.0.1:9180/apisix/admin/upstreams/1
+X-API-KEY: edd1c9f034335f136f87ad84b625c8f1
+Content-Type: application/json
+
+{
+   "type": "roundrobin",
+   "nodes": {
+      "strimzi-kafka-bridge-bridge-service.multicluster-global-hub.svc:8080": 1
+   }
+}
+
+### List Upstream
+GET http://127.0.0.1:9180/apisix/admin/upstreams
+X-API-KEY: edd1c9f034335f136f87ad84b625c8f1
+Content-Type: application/json
+
+
+### Create Route Based on above Upstream
+PUT http://127.0.0.1:9180/apisix/admin/routes/1
+X-API-KEY: edd1c9f034335f136f87ad84b625c8f1
+Content-Type: application/json
+
+{
+   "methods": ["GET"],
+   "host": "example.com",
+   "uri": "/*",
+   "upstream_id": "1"
+}
+
+
+### Or Crate Route and Upstream 
+PUT http://127.0.0.1:9180/apisix/admin/routes/1
+X-API-KEY: edd1c9f034335f136f87ad84b625c8f1
+Content-Type: application/json
+
+{
+   "methods": ["GET", "POST", "DELETE", "PUT"],
+   "host": "example.com",
+   "uri": "/*",
+   "plugins": {
+      "ext-plugin-post-resp": {
+        "conf": [
+          {"name": "my-response-rewrite", "value": "{\"tag\": \"\"}"}
+        ]
+      }
+   },
+   "upstream": {
+      "type": "roundrobin",
+      "nodes": {
+         "strimzi-kafka-bridge-bridge-service.multicluster-global-hub.svc:8080": 1
+      }
+   }
+}
+
+### List global_rules
+GET http://127.0.0.1:9180/apisix/admin/global_rules
+X-API-KEY: edd1c9f034335f136f87ad84b625c8f1
+Content-Type: application/json

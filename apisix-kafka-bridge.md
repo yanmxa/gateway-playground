@@ -86,9 +86,9 @@ while true; do curl -X GET http://localhost:8080/consumers/strimzi-kafka-consume
 -H 'accept: application/vnd.kafka.json.v2+json'; sleep 1; done
 ```
 
-## Install APISix on Openshift
+## Running APISIX on Openshift
 
-### Develope a Customize Plugin and rebuild the APISix Image
+### Develope a Customize Plugin and rebuild the APISIX Image
 
 - Develop the plugin with golang
 
@@ -123,7 +123,9 @@ ext-plugin:
   - https://blog.csdn.net/weixin_42873928/article/details/123279381
 
 
-### [Install APISIX on ROSA](https://docs.api7.ai/apisix/install/kubernetes/rosa)
+### Install APISIX with the Built Image
+
+- [Install APISIX on ROSA]((https://docs.api7.ai/apisix/install/kubernetes/rosa))
 
 ```bash
 oc create sa apisix-sa -n apisix
@@ -137,12 +139,50 @@ helm install apisix apisix/apisix \
   --namespace apisix
 ```
 
-- Startup the plugin when running the server
+- Optional: Install APISIX Dashboard
+
+```bash
+helm install apisix-dashboard apisix/apisix-dashboard --namespace apisix
+
+# expose the dashboard
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: apisix-dashboard-lb
+  namespace: apisix
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/instance: apisix-dashboard
+    app.kubernetes.io/name: apisix-dashboard
+  type: LoadBalancer
+EOF
+```
+
+- Startup the plugin when running the server(config.yaml)
 
 ```yaml
-# edit the apisix configmap to start the plugin
+  etcd:
+    host:                          # it's possible to define multiple etcd hosts addresses of the same etcd cluster.
+      - "http://apisix-etcd.apisix.svc.cluster.local:2379"
+    prefix: "/apisix"    # configuration prefix in etcd
+    timeout: 30    # 30 seconds
+...
+# Nginx will hide all environment variables by default. So you need to declare your variable first in the conf/config.yaml
+# https://github.com/apache/apisix/blob/master/docs/en/latest/external-plugin.md
+nginx_config:
+  envs:
+    - APISIX_LISTEN_ADDRESS
+    - APISIX_CONF_EXPIRE_TIME
+
 ext-plugin:
-  cmd: ["/usr/local/apisix/apisix-go-plugin-runner/go-runner", "run"]
+  # path_for_test: "/tmp/runner.sock" 
+  cmd: ["/usr/local/apisix/apisix-go-plugin-runner/go-runner", "run", "-m", "prod"]
 ```
 
 - Replace the image of the deployment
@@ -150,21 +190,27 @@ ext-plugin:
 ```yaml
 # image: quay.io/myan/apisix-360-go:0.1
 kubectl set image deployment/apisix apisix=quay.io/myan/apisix-360-go:0.1
+
+# set the environment variable required by the go plugin runner
+# kubectl patch deploy apisix -n apisix -p '{"spec":{"template":{"spec":{"containers":[{"name":"apisix","env":[{"name":"APISIX_LISTEN_ADDRESS","value":"unix:/tmp/runner.sock"},{"name":"APISIX_CONF_EXPIRE_TIME","value":"3600"}]}]}}}}'
 ```
 
-// TODO
-## Deploy an Envoy Sample with GatewayClass、Gateway and HTTPRoute on kafka namespace
+### Config the Kafka Route with Admin API
 
-- Proxy kafka with APISix Gateway
+- Forward Admin Server to Local Host
 
 ```bash
 # get the kafkabridge service(8080)
 KAFKA_NAMESPACE=kafka
 kubectl get svc -n $KAFKA_NAMESPACE strimzi-kafka-bridge-bridge-service
 KAFKA_SERVICE=$(kubectl get svc -l strimzi.io/cluster=strimzi-kafka-bridge -n $KAFKA_NAMESPACE -o jsonpath="{.items[0].metadata.name}")
+# KAFKA_SERVICE=strimzi-kafka-bridge-bridge-service
 
 # configure the api by apisix pod
-kubectl exec -it $(kubectl get pods -l "app.kubernetes.io/name=apisix,app.kubernetes.io/instance=apisix" -n apisix -o jsonpath="{.items[0].metadata.name}") -n apisix -c apisix -- sh
+# kubectl exec -it $(kubectl get pods -l "app.kubernetes.io/name=apisix,app.kubernetes.io/instance=apisix" -n apisix -o jsonpath="{.items[0].metadata.name}") -n apisix -c apisix -- sh
+
+# forward 9180 port to local host
+kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/name=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9180:9180
 
 # create an upstream(upstream_id = 1)
 curl "http://127.0.0.1:9180/apisix/admin/upstreams/1" \
@@ -193,6 +239,13 @@ curl "http://127.0.0.1:9180/apisix/admin/routes/1" \
   "methods": ["GET", "POST", "DELETE", "PUT"],
   "host": "example.com",
   "uri": "/*",
+  "plugins": {
+    "ext-plugin-post-resp": {
+      "conf": [
+        {"name":"my-response-rewrite", "value":"{\"tag\":\"\"}"}
+      ]
+    }
+  },
   "upstream": {
     "type": "roundrobin",
     "nodes": {
@@ -205,11 +258,11 @@ curl "http://127.0.0.1:9180/apisix/admin/routes/1" \
 curl -i -H "Host: example.com" -X GET "http://127.0.0.1:9080/topics"
 ```
 
-- Verification
+### Request the Kafka Route with Client API
 
 ```bash
 # forward the http api of apisix to local host
-kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/instance -n apisix -o jsonpath="{.items[0].metadata.name}") 9080:9080
+kubectl -n apisix port-forward $(kubectl get pods -l app.kubernetes.io/name=apisix -n apisix -o jsonpath="{.items[0].metadata.name}") 9080:9080
 
 # list topic
 curl --verbose --header "Host: example.com" http://localhost:9080/topics
@@ -255,37 +308,4 @@ while true; do curl --header "Host: example.com" -X GET http://localhost:9080/co
 -H 'accept: application/vnd.kafka.json.v2+json'; sleep 1; done
 ```
 
-## Start authentication with go plugin of apisix
-
-
-
-### Add the plugin runner image to config.yaml
-
-```bash
-# edit cm apisix to add image: quay.io/myan/apisix-310-go:0.1
-apisix:
-  image: quay.io/myan/apisix-310-go:0.1
-
-# then check the apisix server config: /usr/local/apisix/conf/config.yaml
-
-curl "http://127.0.0.1:9180/apisix/admin/routes/1" \
--H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" -X PUT -d '
-{
-  "methods": ["GET", "POST", "DELETE", "PUT"],
-  "host": "example.com",
-  "uri": "/*",
-  "plugins": {
-        "ext-plugin-post-resp": {
-            "conf" : [
-                {"name": "my-response-rewrite", "value": "{\"tag\":\"hello my response\"}"}
-            ]
-        }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": {
-      "strimzi-kafka-bridge-bridge-service.multicluster-global-hub.svc:8080": 1
-    }
-  }
-}'
-```
+## Develop an Authentication Plugin Using Payload
